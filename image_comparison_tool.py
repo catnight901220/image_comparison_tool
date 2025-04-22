@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QSpinBox, QGroupBox, QScrollArea, QLineEdit, QToolTip,
                             QRadioButton, QButtonGroup, QMessageBox, QCheckBox, QFrame)
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor
-from PyQt5.QtCore import Qt, QPoint, QRect
+from PyQt5.QtCore import Qt, QPoint, QRect, QTimer, QPropertyAnimation, QEasingCurve
 import numpy as np
 from PIL import Image, ImageDraw
 import multiprocessing as mp
@@ -857,182 +857,304 @@ class ImageComparisonTool(QMainWindow):
         QMessageBox.information(self, "網格大小已更新", f"網格大小已設為 {self.grid_size}x{self.grid_size}，請重新執行特徵點尋找。")
 
     def toggle_theme_mode(self):
-        """切換主題模式"""
+        """切換主題模式並添加過渡特效"""
         is_dark = self.theme_button.isChecked()
-        if is_dark:
-            # 更新按鈕文字
-            self.theme_button.setText("切換回亮色模式")
-            
-            # 啟用黑暗模式
-            dark_stylesheet = """
-                QWidget { 
-                    background-color: #2D2D30; 
-                    color: #E0E0E0; 
-                }
-                QGroupBox { 
-                    border: 1px solid #3F3F46; 
-                    border-radius: 5px; 
-                    margin-top: 10px; 
-                    font-weight: bold; 
-                    font-size: 13pt;
-                    color: #E0E0E0;
-                }
-                QGroupBox::title { 
-                    subcontrol-origin: margin; 
-                    left: 10px; 
-                    padding: 0 5px 0 5px; 
-                }
-                QPushButton { 
-                    background-color: #0E639C; 
-                    color: white; 
-                    border: none; 
-                    border-radius: 3px; 
-                    padding: 5px; 
-                }
-                QPushButton:hover { 
-                    background-color: #1177BB; 
-                }
-                QPushButton:disabled { 
-                    background-color: #3F3F46; 
-                    color: #959595; 
-                }
-                QComboBox, QSpinBox, QLineEdit { 
-                    background-color: #333337; 
-                    color: #E0E0E0; 
-                    border: 1px solid #3F3F46; 
-                    border-radius: 3px; 
-                }
-                QScrollArea, QLabel { 
-                    background-color: #2D2D30; 
-                    color: #E0E0E0; 
-                }
-                QCheckBox { 
-                    color: #E0E0E0; 
-                }
-                QFrame { 
-                    background-color: #252526;
-                    border: 1px solid #3F3F46;
-                }
-            """
-            self.setStyleSheet(dark_stylesheet)
-            
-            # 保持主題按鈕樣式
-            self.theme_button.setStyleSheet("""
-                QPushButton {
-                    font-size: 16pt;
-                    font-weight: bold;
-                    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4A148C, stop:1 #880E4F);
-                    color: white;
-                    border-radius: 10px;
-                    padding: 15px;
-                }
-                QPushButton:hover {
-                    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6A1B9A, stop:1 #AD1457);
-                }
-            """)
-            
-            # 更新特定樣式
-            self.diff_ratio_label.setStyleSheet("QLabel { font-weight: bold; color: #FF79C6; }")
-            
-            # 更新圖像框架樣式
-            for i in range(4):
-                if hasattr(self, 'display_labels') and i < len(self.display_labels):
-                    self.display_labels[i].setStyleSheet("background-color: #1E1E1E; border: 1px solid #3F3F46;")
-            
-            # 更新選擇圖像的框架
-            for i in range(4):
-                if hasattr(self, 'image_buttons') and i < len(self.image_buttons):
-                    parent = self.image_buttons[i].parent()
-                    if parent and isinstance(parent, QFrame):
-                        parent.setStyleSheet("QFrame { background-color: #252526; border: 1px solid #3F3F46; border-radius: 5px; }")
-            
-            # 更新圖像顯示區域
-            for i in range(self.display_layout.count()):
-                widget = self.display_layout.itemAt(i).widget()
-                if widget and isinstance(widget, QGroupBox):
-                    widget.setStyleSheet("QGroupBox { font-weight: bold; font-size: 13pt; background-color: #2D2D30; border: 1px solid #3F3F46; }")
-                    # 尋找內部的QLabel
-                    for child in widget.findChildren(QLabel):
-                        if child != self.display_labels[i % 4]:  # 避免重複設置display_labels
-                            child.setStyleSheet("background-color: #2D2D30; color: #E0E0E0;")
-            
-            # 更新圖片路徑文字顏色為白色
-            for i in range(4):
-                if hasattr(self, 'image_path_edits') and i < len(self.image_path_edits):
-                    self.image_path_edits[i].setStyleSheet("color: white; padding: 5px; background-color: #333337; border: 1px solid #3F3F46;")
-            
-        else:
-            # 更新按鈕文字
-            self.theme_button.setText("切換黑暗模式")
-            
-            # 恢復亮色模式
-            light_stylesheet = """
-                QLabel, QPushButton, QCheckBox, QComboBox, QSpinBox, QLineEdit { 
-                    font-size: 12pt; 
-                }
-                QGroupBox { 
-                    font-size: 13pt; 
-                    font-weight: bold; 
-                }
-            """
-            self.setStyleSheet(light_stylesheet)
-            
-            # 恢復主題按鈕樣式
-            self.theme_button.setStyleSheet("""
-                QPushButton {
-                    font-size: 16pt;
-                    font-weight: bold;
-                    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2C3E50, stop:1 #4CA1AF);
-                    color: white;
-                    border-radius: 10px;
-                    padding: 15px;
-                }
-                QPushButton:hover {
-                    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #34495E, stop:1 #5DADE2);
-                }
-            """)
-            
-            # 恢復特定樣式
-            self.diff_ratio_label.setStyleSheet("QLabel { font-weight: bold; color: #E91E63; }")
-            
-            # 恢復其他控件的原始樣式
-            self.update_button.setStyleSheet("QPushButton { min-height: 30px; background-color: #4CAF50; color: white; }")
-            self.find_button1.setStyleSheet("QPushButton { min-height: 30px; background-color: #2196F3; color: white; }")
-            self.find_button2.setStyleSheet("QPushButton { min-height: 30px; background-color: #2196F3; color: white; }")
-            self.save_button.setStyleSheet("QPushButton { min-height: 30px; background-color: #FF9800; color: white; }")
-            
-            # 恢復圖像顯示區域樣式
-            for i in range(4):
-                if hasattr(self, 'display_labels') and i < len(self.display_labels):
-                    self.display_labels[i].setStyleSheet("background-color: #f0f0f0; border: 1px solid #ddd;")
-            
-            # 恢復選擇圖像的框架
-            for i in range(4):
-                if hasattr(self, 'image_buttons') and i < len(self.image_buttons):
-                    parent = self.image_buttons[i].parent()
-                    if parent and isinstance(parent, QFrame):
-                        parent.setStyleSheet("QFrame { background-color: #f9f9f9; border-radius: 5px; }")
-            
-            # 恢復圖像顯示區域
-            for i in range(self.display_layout.count()):
-                widget = self.display_layout.itemAt(i).widget()
-                if widget and isinstance(widget, QGroupBox):
-                    widget.setStyleSheet("QGroupBox { font-weight: bold; }")
-            
-            for i in range(4):
-                if self.image_buttons[i]:
-                    self.image_buttons[i].setStyleSheet("QPushButton { min-height: 30px; background-color: #2196F3; color: white; }")
-            
-            # 恢復圖片路徑文字顏色
-            for i in range(4):
-                if hasattr(self, 'image_path_edits') and i < len(self.image_path_edits):
-                    if self.image_paths[i]:  # 已選擇圖像
-                        self.image_path_edits[i].setStyleSheet("color: black; padding: 5px;")
-                    else:  # 未選擇圖像
-                        self.image_path_edits[i].setStyleSheet("color: gray; padding: 5px;")
         
-        # 更新所有控件
-        self.update()
+        # 開始過渡動畫
+        self.start_theme_transition(is_dark)
+        
+    def start_theme_transition(self, to_dark_mode):
+        """開始主題過渡動畫"""
+        # 設置過渡步數和持續時間
+        self.transition_steps = 10
+        self.transition_current_step = 0
+        self.transition_to_dark = to_dark_mode
+        
+        # 更新按鈕文字
+        if to_dark_mode:
+            self.theme_button.setText("切換回亮色模式")
+        else:
+            self.theme_button.setText("切換黑暗模式")
+        
+        # 定義亮色模式和暗色模式的主要顏色
+        self.light_colors = {
+            "background": QColor("#FFFFFF"),
+            "foreground": QColor("#000000"),
+            "button": QColor("#2196F3"),
+            "frame": QColor("#F9F9F9"),
+            "border": QColor("#DDDDDD")
+        }
+        
+        self.dark_colors = {
+            "background": QColor("#2D2D30"),
+            "foreground": QColor("#E0E0E0"),
+            "button": QColor("#0E639C"),
+            "frame": QColor("#252526"),
+            "border": QColor("#3F3F46")
+        }
+        
+        # 創建並啟動計時器
+        self.transition_timer = QTimer(self)
+        self.transition_timer.timeout.connect(self.update_theme_transition)
+        self.transition_timer.start(30)  # 每30毫秒更新一次
+    
+    def update_theme_transition(self):
+        """更新主題過渡動畫的一個步驟"""
+        self.transition_current_step += 1
+        progress = self.transition_current_step / self.transition_steps
+        
+        # 計算過渡中的顏色
+        transition_colors = {}
+        for key in self.light_colors.keys():
+            if self.transition_to_dark:
+                start_color = self.light_colors[key]
+                end_color = self.dark_colors[key]
+            else:
+                start_color = self.dark_colors[key]
+                end_color = self.light_colors[key]
+            
+            # 計算當前步驟的混合顏色
+            r = int(start_color.red() + (end_color.red() - start_color.red()) * progress)
+            g = int(start_color.green() + (end_color.green() - start_color.green()) * progress)
+            b = int(start_color.blue() + (end_color.blue() - start_color.blue()) * progress)
+            
+            transition_colors[key] = QColor(r, g, b)
+        
+        # 應用過渡顏色
+        self.apply_transition_colors(transition_colors)
+        
+        # 檢查是否完成過渡
+        if self.transition_current_step >= self.transition_steps:
+            self.transition_timer.stop()
+            # 完成過渡，應用最終樣式
+            if self.transition_to_dark:
+                self.apply_dark_theme()
+            else:
+                self.apply_light_theme()
+    
+    def apply_transition_colors(self, colors):
+        """應用過渡中的顏色"""
+        # 創建過渡樣式表
+        bg_color = colors["background"].name()
+        fg_color = colors["foreground"].name()
+        button_color = colors["button"].name()
+        frame_color = colors["frame"].name()
+        border_color = colors["border"].name()
+        
+        transition_stylesheet = f"""
+            QWidget {{ 
+                background-color: {bg_color}; 
+                color: {fg_color}; 
+            }}
+            QGroupBox {{ 
+                border: 1px solid {border_color}; 
+                border-radius: 5px; 
+                margin-top: 10px; 
+                font-weight: bold; 
+                font-size: 13pt;
+                color: {fg_color};
+            }}
+            QFrame {{ 
+                background-color: {frame_color};
+                border: 1px solid {border_color};
+            }}
+        """
+        
+        self.setStyleSheet(transition_stylesheet)
+        
+        # 更新圖像顯示區域
+        for i in range(4):
+            if hasattr(self, 'display_labels') and i < len(self.display_labels):
+                r = int(245 + (30 - 245) * (self.transition_current_step / self.transition_steps) if self.transition_to_dark else 30 + (245 - 30) * (self.transition_current_step / self.transition_steps))
+                self.display_labels[i].setStyleSheet(f"background-color: rgb({r},{r},{r}); border: 1px solid {border_color};")
+        
+        # 更新主題按鈕樣式
+        if self.transition_to_dark:
+            from_color = "#2C3E50"
+            to_color = "#4A148C"
+        else:
+            from_color = "#4A148C"
+            to_color = "#2C3E50"
+            
+        # 計算漸變中間色
+        self.theme_button.setStyleSheet(f"""
+            QPushButton {{
+                font-size: 16pt;
+                font-weight: bold;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {from_color}, stop:1 {to_color});
+                color: white;
+                border-radius: 10px;
+                padding: 15px;
+            }}
+        """)
+    
+    def apply_dark_theme(self):
+        """完成過渡後應用完整的黑暗主題"""
+        # 應用完整的黑暗模式樣式
+        dark_stylesheet = """
+            QWidget { 
+                background-color: #2D2D30; 
+                color: #E0E0E0; 
+            }
+            QGroupBox { 
+                border: 1px solid #3F3F46; 
+                border-radius: 5px; 
+                margin-top: 10px; 
+                font-weight: bold; 
+                font-size: 13pt;
+                color: #E0E0E0;
+            }
+            QGroupBox::title { 
+                subcontrol-origin: margin; 
+                left: 10px; 
+                padding: 0 5px 0 5px; 
+            }
+            QPushButton { 
+                background-color: #0E639C; 
+                color: white; 
+                border: none; 
+                border-radius: 3px; 
+                padding: 5px; 
+            }
+            QPushButton:hover { 
+                background-color: #1177BB; 
+            }
+            QPushButton:disabled { 
+                background-color: #3F3F46; 
+                color: #959595; 
+            }
+            QComboBox, QSpinBox, QLineEdit { 
+                background-color: #333337; 
+                color: #E0E0E0; 
+                border: 1px solid #3F3F46; 
+                border-radius: 3px; 
+            }
+            QScrollArea, QLabel { 
+                background-color: #2D2D30; 
+                color: #E0E0E0; 
+            }
+            QCheckBox { 
+                color: #E0E0E0; 
+            }
+            QFrame { 
+                background-color: #252526;
+                border: 1px solid #3F3F46;
+            }
+        """
+        self.setStyleSheet(dark_stylesheet)
+        
+        # 保持主題按鈕樣式
+        self.theme_button.setStyleSheet("""
+            QPushButton {
+                font-size: 16pt;
+                font-weight: bold;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4A148C, stop:1 #880E4F);
+                color: white;
+                border-radius: 10px;
+                padding: 15px;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6A1B9A, stop:1 #AD1457);
+            }
+        """)
+        
+        # 更新特定樣式
+        self.diff_ratio_label.setStyleSheet("QLabel { font-weight: bold; color: #FF79C6; }")
+        
+        # 更新圖像框架樣式
+        for i in range(4):
+            if hasattr(self, 'display_labels') and i < len(self.display_labels):
+                self.display_labels[i].setStyleSheet("background-color: #1E1E1E; border: 1px solid #3F3F46;")
+        
+        # 更新選擇圖像的框架
+        for i in range(4):
+            if hasattr(self, 'image_buttons') and i < len(self.image_buttons):
+                parent = self.image_buttons[i].parent()
+                if parent and isinstance(parent, QFrame):
+                    parent.setStyleSheet("QFrame { background-color: #252526; border: 1px solid #3F3F46; border-radius: 5px; }")
+        
+        # 更新圖像顯示區域
+        for i in range(self.display_layout.count()):
+            widget = self.display_layout.itemAt(i).widget()
+            if widget and isinstance(widget, QGroupBox):
+                widget.setStyleSheet("QGroupBox { font-weight: bold; font-size: 13pt; background-color: #2D2D30; border: 1px solid #3F3F46; }")
+                # 尋找內部的QLabel
+                for child in widget.findChildren(QLabel):
+                    if child != self.display_labels[i % 4]:  # 避免重複設置display_labels
+                        child.setStyleSheet("background-color: #2D2D30; color: #E0E0E0;")
+        
+        # 更新圖片路徑文字顏色為白色
+        for i in range(4):
+            if hasattr(self, 'image_path_edits') and i < len(self.image_path_edits):
+                self.image_path_edits[i].setStyleSheet("color: white; padding: 5px; background-color: #333337; border: 1px solid #3F3F46;")
+    
+    def apply_light_theme(self):
+        """完成過渡後應用完整的亮色主題"""
+        # 恢復亮色模式
+        light_stylesheet = """
+            QLabel, QPushButton, QCheckBox, QComboBox, QSpinBox, QLineEdit { 
+                font-size: 12pt; 
+            }
+            QGroupBox { 
+                font-size: 13pt; 
+                font-weight: bold; 
+            }
+        """
+        self.setStyleSheet(light_stylesheet)
+        
+        # 恢復主題按鈕樣式
+        self.theme_button.setStyleSheet("""
+            QPushButton {
+                font-size: 16pt;
+                font-weight: bold;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2C3E50, stop:1 #4CA1AF);
+                color: white;
+                border-radius: 10px;
+                padding: 15px;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #34495E, stop:1 #5DADE2);
+            }
+        """)
+        
+        # 恢復特定樣式
+        self.diff_ratio_label.setStyleSheet("QLabel { font-weight: bold; color: #E91E63; }")
+        
+        # 恢復其他控件的原始樣式
+        self.update_button.setStyleSheet("QPushButton { min-height: 30px; background-color: #4CAF50; color: white; }")
+        self.find_button1.setStyleSheet("QPushButton { min-height: 30px; background-color: #2196F3; color: white; }")
+        self.find_button2.setStyleSheet("QPushButton { min-height: 30px; background-color: #2196F3; color: white; }")
+        self.save_button.setStyleSheet("QPushButton { min-height: 30px; background-color: #FF9800; color: white; }")
+        
+        # 恢復圖像顯示區域樣式
+        for i in range(4):
+            if hasattr(self, 'display_labels') and i < len(self.display_labels):
+                self.display_labels[i].setStyleSheet("background-color: #f0f0f0; border: 1px solid #ddd;")
+        
+        # 恢復選擇圖像的框架
+        for i in range(4):
+            if hasattr(self, 'image_buttons') and i < len(self.image_buttons):
+                parent = self.image_buttons[i].parent()
+                if parent and isinstance(parent, QFrame):
+                    parent.setStyleSheet("QFrame { background-color: #f9f9f9; border-radius: 5px; }")
+        
+        # 恢復圖像顯示區域
+        for i in range(self.display_layout.count()):
+            widget = self.display_layout.itemAt(i).widget()
+            if widget and isinstance(widget, QGroupBox):
+                widget.setStyleSheet("QGroupBox { font-weight: bold; }")
+        
+        # 恢復圖片路徑文字顏色
+        for i in range(4):
+            if hasattr(self, 'image_path_edits') and i < len(self.image_path_edits):
+                if self.image_paths[i]:  # 已選擇圖像
+                    self.image_path_edits[i].setStyleSheet("color: black; padding: 5px;")
+                else:  # 未選擇圖像
+                    self.image_path_edits[i].setStyleSheet("color: gray; padding: 5px;")
+        
+        for i in range(4):
+            if self.image_buttons[i]:
+                self.image_buttons[i].setStyleSheet("QPushButton { min-height: 30px; background-color: #2196F3; color: white; }")
 
 if __name__ == "__main__":
     # 檢查是否支援多進程
