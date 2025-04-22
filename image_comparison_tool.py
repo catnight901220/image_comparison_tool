@@ -444,7 +444,12 @@ class ImageComparisonTool(QMainWindow):
                 self.image_path_edits[index].setText(file_path)
                 self.image_path_edits[index].setToolTip(file_path)
                 self.image_path_edits[index].setCursorPosition(0)  # 游標置於開始位置
-                self.image_path_edits[index].setStyleSheet("color: black;")
+                
+                # 根據當前主題設置文字顏色
+                if hasattr(self, 'theme_button') and self.theme_button.isChecked():  # 黑暗模式
+                    self.image_path_edits[index].setStyleSheet("color: white; padding: 5px; background-color: #333337; border: 1px solid #3F3F46;")
+                else:  # 亮色模式
+                    self.image_path_edits[index].setStyleSheet("color: black; padding: 5px;")
                 
                 # 更新原始標籤（保留但隱藏）
                 self.image_labels[index].setText(os.path.basename(file_path))
@@ -463,7 +468,7 @@ class ImageComparisonTool(QMainWindow):
                 error_msg = f"載入失敗: {str(e)}"
                 self.image_path_edits[index].setText(error_msg)
                 self.image_path_edits[index].setToolTip(error_msg)
-                self.image_path_edits[index].setStyleSheet("color: red;")
+                self.image_path_edits[index].setStyleSheet("color: red; padding: 5px;")
                 self.image_labels[index].setText(error_msg)
                 self.image_paths[index] = None
                 self.images[index] = None
